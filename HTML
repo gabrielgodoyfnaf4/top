@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950 text-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chronos Paradox | Interactive Sci-Fi Text Adventure</title>
+    <!-- Google Fonts for futuristic cyberpunk aesthetic -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tone.js for synthesized audio effects -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        heading: ['Orbitron', 'sans-serif'],
+                        body: ['Rajdhani', 'sans-serif']
+                    },
+                    colors: {
+                        cyan: {
+                            400: '#22d3ee',
+                            500: '#06b6d4',
+                            900: '#164e63',
+                        },
+                        neon: {
+                            purple: '#a855f7',
+                            pink: '#ec4899',
+                            emerald: '#10b981',
+                            amber: '#f59e0b'
+                        }
+                    },
+                    animation: {
+                        'pulse-glow': 'pulseGlow 2s infinite alternate',
+                        'scanline': 'scanline 8s linear infinite',
+                    },
+                    keyframes: {
+                        pulseGlow: {
+                            '0%': { boxShadow: '0 0 10px rgba(6, 182, 212, 0.3)' },
+                            '100%': { boxShadow: '0 0 25px rgba(6, 182, 212, 0.8), 0 0 10px rgba(168, 85, 247, 0.5)' }
+                        },
+                        scanline: {
+                            '0%': { transform: 'translateY(-100%)' },
+                            '100%': { transform: 'translateY(1000%)' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Custom styling for retro-futuristic UI elements */
+        body {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 1.15rem;
+            letter-spacing: 0.02em;
+        }
+
+        /* Glassmorphism Panel */
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(34, 211, 238, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+        }
+
+        /* Custom scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(6, 182, 212, 0.5);
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(34, 211, 238, 0.8);
+        }
+
+        /* CRT Screen Scanline Overlay Effect */
+        .scanlines {
+            position: relative;
+            overflow: hidden;
+        }
+        .scanlines::before {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+            background-size: 100% 4px;
+            z-index: 20;
+            pointer-events: none;
+            opacity: 0.4;
+        }
+
+        /* Glitch effect on header hover */
+        .glitch-hover:hover {
+            text-shadow: 2px 0 #ec4899, -2px 0 #06b6d4;
+        }
+    </style>
+</head>
+<body class="h-full bg-slate-950 text-slate-100 flex flex-col justify-between scanlines selection:bg-cyan-500 selection:text-slate-950">
+
+    <!-- Header Bar -->
+    <header class="w-full border-b border-cyan-500/30 bg-slate-900/80 px-4 py-3 shadow-lg z-30 sticky top-0 backdrop-blur">
+        <div class="max-w-6xl mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="w-3 h-3 rounded-full bg-cyan-400 animate-ping"></div>
+                <h1 class="font-heading font-extrabold text-xl md:text-2xl text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-teal-300 to-purple-500 glitch-hover">
+                    CHRONOS PARADOX
+                </h1>
+            </div>
+            <div class="flex items-center space-x-3">
+                <button id="btn-audio-toggle" data-action="toggle-audio" class="px-3 py-1 rounded-md text-xs font-semibold bg-slate-800 hover:bg-slate-700 border border-slate-700 text-cyan-400 transition-colors duration-200">
+                    🔊 AUDIO: OFF
+                </button>
+                <button id="btn-restart" data-action="restart-game" class="px-3 py-1 rounded-md text-xs font-semibold bg-red-950/60 hover:bg-red-900 border border-red-700/50 text-red-300 transition-colors duration-200">
+                    🔄 RESTART
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-6xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 flex-grow">
+        
+        <!-- Left Side / Top: Player Stats & Inventory HUD -->
+        <aside class="lg:col-span-4 flex flex-col space-y-4">
+            
+            <!-- Vitals Card -->
+            <section class="glass-panel p-5 rounded-xl border border-cyan-500/30">
+                <h2 class="font-heading text-lg font-semibold text-cyan-400 border-b border-slate-700/60 pb-2 mb-4 flex items-center justify-between">
+                    <span>SYSTEM DIAGNOSTICS</span>
+                    <span class="text-xs text-slate-400 uppercase tracking-widest" id="location-badge">SECTOR 7</span>
+                </h2>
+
+                <!-- Stat Bars -->
+                <div class="space-y-3" id="stats-container">
+                    <!-- Health -->
+                    <div data-stat-type="health" class="stat-item">
+                        <div class="flex justify-between text-sm font-semibold mb-1">
+                            <span class="text-slate-300">HEALTH</span>
+                            <span id="stat-health-val" class="text-red-400">100 / 100</span>
+                        </div>
+                        <div class="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden border border-slate-700">
+                            <div id="stat-health-bar" class="bg-gradient-to-r from-red-600 to-red-400 h-full transition-all duration-500" style="width: 100%;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Energy -->
+                    <div data-stat-type="energy" class="stat-item">
+                        <div class="flex justify-between text-sm font-semibold mb-1">
+                            <span class="text-slate-300">ENERGY</span>
+                            <span id="stat-energy-val" class="text-cyan-400">80 / 100</span>
+                        </div>
+                        <div class="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden border border-slate-700">
+                            <div id="stat-energy-bar" class="bg-gradient-to-r from-cyan-600 to-cyan-400 h-full transition-all duration-500" style="width: 80%;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Credits & Karma Counters -->
+                    <div class="grid grid-cols-2 gap-3 pt-2">
+                        <div class="bg-slate-900/60 p-2.5 rounded-lg border border-slate-800 flex flex-col items-center">
+                            <span class="text-xs text-slate-400 font-semibold">CREDITS</span>
+                            <span id="stat-credits" class="font-heading font-bold text-amber-400 text-lg">250 ₡</span>
+                        </div>
+                        <div class="bg-slate-900/60 p-2.5 rounded-lg border border-slate-800 flex flex-col items-center">
+                            <span class="text-xs text-slate-400 font-semibold">KARMA</span>
+                            <span id="stat-karma" class="font-heading font-bold text-purple-400 text-lg">NEUTRAL</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Inventory Panel -->
+            <section class="glass-panel p-5 rounded-xl border border-cyan-500/30 flex-grow flex flex-col">
+                <h2 class="font-heading text-lg font-semibold text-cyan-400 border-b border-slate-700/60 pb-2 mb-3">
+                    EQUIPMENT & ITEMS
+                </h2>
+                <div id="inventory-list" class="grid grid-cols-1 gap-2 overflow-y-auto max-h-48 lg:max-h-none flex-grow">
+                    <!-- Dynamic inventory items rendered by JavaScript -->
+                </div>
+            </section>
+
+        </aside>
+
+        <!-- Right Side: Narrative Screen & Interactive Options -->
+        <section class="lg:col-span-8 flex flex-col space-y-4">
+            
+            <!-- Main Story Log Display -->
+            <article class="glass-panel p-6 rounded-xl border border-cyan-500/30 flex-grow flex flex-col justify-between shadow-2xl min-h-[350px]">
+                <div>
+                    <!-- Location / Node Header -->
+                    <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-800">
+                        <span id="node-title" class="font-heading text-xl text-teal-300 font-bold uppercase tracking-wider">
+                            CRYO-CHAMBER DEPRESSURIZATION
+                        </span>
+                        <span id="time-stamp" class="text-xs text-slate-500 font-mono">
+                            TIME: STABLE
+                        </span>
+                    </div>
+
+                    <!-- Dynamic Scene Image / Icon Header -->
+                    <div id="scene-graphic" class="w-full h-32 md:h-40 mb-4 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center overflow-hidden relative">
+                        <div class="absolute inset-0 bg-gradient-to-t from-slate-950 to-transparent z-10"></div>
+                        <span id="scene-icon" class="text-6xl z-0 transform transition-transform duration-500 hover:scale-110">🚀</span>
+                    </div>
+
+                    <!-- Story Text Output Container -->
+                    <div id="story-text" class="text-slate-200 text-lg leading-relaxed space-y-3 font-medium">
+                        <!-- Dynamic Story Text Inserted Here -->
+                    </div>
+                </div>
+
+                <!-- Event Notification Bar -->
+                <div id="event-log" class="mt-4 p-3 rounded-lg bg-cyan-950/40 border border-cyan-500/30 text-cyan-300 text-sm hidden animate-fade-in">
+                    <!-- Dynamic updates (e.g. "+50 Credits", "Health Restored") -->
+                </div>
+            </article>
+
+            <!-- Action Choices Panel -->
+            <section class="glass-panel p-5 rounded-xl border border-cyan-500/30">
+                <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">AVAILABLE ACTIONS</h3>
+                <div id="choices-container" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <!-- Dynamic choice buttons rendered by JS using data-choice-id attributes -->
+                </div>
+            </section>
+
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="w-full border-t border-slate-800 bg-slate-950 py-3 text-center text-xs text-slate-500">
+        <div class="max-w-6xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-2">
+            <span>Chronos Paradox Text Adventure Engine</span>
+            <span>Created with HTML5, Tailwind CSS, & Vanilla JS</span>
+        </div>
+    </footer>
+
+    <!-- GAME ENGINE LOGIC SCRIPT -->
+    <script>
+        /**
+         * CHRONOS PARADOX - Interactive Sci-Fi Story Engine
+         * Built for clean deployment on GitHub Pages.
+         */
+
+        // ==========================================
+        // 1. GAME DATA & STORY GRAPH STATE
+        // ==========================================
+
+        const STORY_DATA = {
+            start: {
+                title: "Cryo-Pod Depressurization",
+                icon: "⚡",
+                text: "Cold mist vents into your lungs as you awaken. Warning alarms flash crimson across your POD-3 interface. System alert: Sector 7 Chrono-Station undergoing temporal collapse. You hold a cracked data-slate in your trembling hand.",
+                choices: [
+                    {
+                        id: "inspect_pod",
+                        text: "Search the Pod Emergency Kit",
+                        effect: { health: 0, energy: +10, credits: 50, itemAdd: { id: "plasma_cutter", name: "Plasma Cutter", icon: "🔫", desc: "Cuts through thick hull plating" } }
+                    },
+                    {
+                        id: "force_door",
+                        text: "Force the pod door open immediately",
+                        effect: { health: -15, energy: -10, credits: 0 }
+                    }
+                ]
+            },
+            inspect_pod: {
+                title: "Pod Emergency Supplies",
+                icon: "🧰",
+                text: "You retrieve a heavy Plasma Cutter and a cell recharge pack. Sparks fly from the corridor outside as heavy hydraulic doors slam shut in sequence.",
+                choices: [
+                    {
+                        id: "corridor_stealth",
+                        text: "Creep into the Shadowed Corridor",
+                        effect: { karma: 1 }
+                    },
+                    {
+                        id: "override_terminal",
+                        text: "Hack nearby Control Terminal",
+                        effect: { energy: -15, credits: 100 }
+                    }
+                ]
+            },
+            force_door: {
+                title: "Corridor Breach",
+                icon: "💥",
+                text: "The heavy door yields with a screech of torn metal, straining your muscles. You step into a corridor bathed in flashing warning lights. A security drone hovers nearby, scanning for life signs.",
+                choices: [
+                    {
+                        id: "fight_drone",
+                        text: "Attack security drone head-on",
+                        reqItem: "plasma_cutter",
+                        reqMessage: "Requires Plasma Cutter",
+                        effect: { health: -20, credits: 150, itemAdd: { id: "security_key", name: "Security Keycard", icon: "🔑", desc: "Grants Tier-2 access" } }
+                    },
+                    {
+                        id: "corridor_stealth",
+                        text: "Evade into maintenance shaft",
+                        effect: { energy: -10 }
+                    }
+                ]
+            },
+            corridor_stealth: {
+                title: "Maintenance Shafts",
+                icon: "🦇",
+                text: "You slip into the narrow service conduits. Deep temporal vibrations reverberate through the floor. Down the hall, a mysterious engineer is cornered by malfunctioning automata.",
+                choices: [
+                    {
+                        id: "save_engineer",
+                        text: "Intervene and save the engineer",
+                        effect: { health: -10, karma: 5, itemAdd: { id: "chrono_core", name: "Chrono-Core", icon: "🔮", desc: "Stabilizes localized time" } }
+                    },
+                    {
+                        id: "ignore_engineer",
+                        text: "Bypass them and head straight to Reactor",
+                        effect: { karma: -5, credits: 100 }
+                    }
+                ]
+            },
+            override_terminal: {
+                title: "Terminal Control",
+                icon: "💻",
+                text: "Your fingers dance over the holographic keys. You override localized security feeds and discover the cause of the disaster: someone intentionally overloaded the Chrono-Reactor to force a timeline reset.",
+                choices: [
+                    {
+                        id: "save_engineer",
+                        text: "Reroute power to aid survivors in Engineering",
+                        effect: { karma: 3 }
+                    },
+                    {
+                        id: "reactor_core",
+                        text: "Lock down Sector 7 and head to Reactor Core",
+                        effect: { energy: +20 }
+                    }
+                ]
+            },
+            fight_drone: {
+                title: "Scrapped Sentinel",
+                icon: "🤖",
+                text: "Your plasma blast pierces the drone's primary sensor array! It collapses in a shower of sparks. You scavenge its high-grade encrypted keycard.",
+                choices: [
+                    {
+                        id: "reactor_core",
+                        text: "Use Security Keycard on Reactor Vault",
+                        reqItem: "security_key",
+                        effect: { energy: 10 }
+                    },
+                    {
+                        id: "time_vault",
+                        text: "Use Keycard on Sealed Research Vault",
+                        reqItem: "security_key",
+                        effect: { credits: 300, karma: 2 }
+                    }
+                ]
+            },
+            save_engineer: {
+                title: "Allies in the Dark",
+                icon: "🤝",
+                text: "The grateful engineer gives you a rare Chrono-Core fragment. 'Take this,' she pants. 'It will allow you to step outside the temporal wave at the main reactor!'",
+                choices: [
+                    {
+                        id: "reactor_core",
+                        text: "Proceed together to the Reactor Core",
+                        effect: { health: +20, energy: +20 }
+                    }
+                ]
+            },
+            ignore_engineer: {
+                title: "Solitary Path",
+                icon: "🏃",
+                text: "You push forward alone. The ambient air begins to distort—objects around you flicker between decay and brand-new states as temporal waves pass.",
+                choices: [
+                    {
+                        id: "reactor_core",
+                        text: "Rush into the Chrono-Reactor Chamber",
+                        effect: { health: -10 }
+                    }
+                ]
+            },
+            time_vault: {
+                title: "Ancient Vault of Futures",
+                icon: "🏛️",
+                text: "Inside the vault, you find prototype chronometric gear and documents detailing 'Project Genesis'—a plan to rewrite the current century.",
+                choices: [
+                    {
+                        id: "reactor_core",
+                        text: "Take prototypes and sprint to the Reactor Core",
+                        effect: { itemAdd: { id: "chrono_core", name: "Chrono-Core", icon: "🔮", desc: "Stabilizes localized time" } }
+                    }
+                ]
+            },
+            reactor_core: {
+                title: "The Temporal Core",
+                icon: "🌀",
+                text: "You stand before the massive Chrono-Reactor. A swirling singularity of golden temporal energy threatens to implode the station and tear the timeline apart.",
+                choices: [
+                    {
+                        id: "ending_stabilize",
+                        text: "Insert Chrono-Core to stabilize timeline",
+                        reqItem: "chrono_core",
+                        reqMessage: "Requires Chrono-Core",
+                        effect: {}
+                    },
+                    {
+                        id: "ending_reset",
+                        text: "Overload reactor to trigger total Time Reset",
+                        effect: {}
+                    },
+                    {
+                        id: "ending_escape",
+                        text: "Steal escape pod with gathered technology",
+                        effect: {}
+                    }
+                ]
+            },
+            // ENDINGS
+            ending_stabilize: {
+                title: "END: HERO OF THE TIMELINE",
+                icon: "🌟",
+                text: "The Chrono-Core locks into place! A blinding flash of light neutralizes the temporal distortion waves. You saved Sector 7 and locked the current timeline into place.",
+                isEnding: true
+            },
+            ending_reset: {
+                title: "END: THE LOOP BEGINS AGAIN",
+                icon: "♾️",
+                text: "You trigger total reactor rupture. Space and time contract into a singular point, pulling everything into reverse... Cold mist vents into your lungs as you awaken in POD-3.",
+                isEnding: true
+            },
+            ending_escape: {
+                title: "END: TEMPORAL RENEGADE",
+                icon: "🚀",
+                text: "You launch your escape pod seconds before Sector 7 collapses into a black hole. Rich with contraband tech, you chart a course into deep space, unbound by history.",
+                isEnding: true
+            }
+        };
+
+        // ==========================================
+        // 2. INITIAL GAME STATE
+        // ==========================================
+
+        const INITIAL_STATE = {
+            currentNode: "start",
+            stats: {
+                health: 100,
+                maxHealth: 100,
+                energy: 80,
+                maxEnergy: 100,
+                credits: 100,
+                karma: 0
+            },
+            inventory: [
+                { id: "data_slate", name: "Cracked Slate", icon: "📱", desc: "Contains encrypted sector maps" }
+            ],
+            audioEnabled: false
+        };
+
+        // Deep copy helper
+        let gameState = JSON.parse(JSON.stringify(INITIAL_STATE));
+
+        // ==========================================
+        // 3. AUDIO SYSTEM (Tone.js integration)
+        // ==========================================
+
+        let synth = null;
+
+        function initAudio() {
+            if (!synth && window.Tone) {
+                synth = new Tone.Synth().toDestination();
+            }
+        }
+
+        function playSound(type) {
+            if (!gameState.audioEnabled || !synth) return;
+            try {
+                if (Tone.context.state !== 'running') {
+                    Tone.start();
+                }
+                if (type === 'click') {
+                    synth.triggerAttackRelease("C5", "8n");
+                } else if (type === 'event') {
+                    synth.triggerAttackRelease("G5", "16n");
+                } else if (type === 'gameover') {
+                    synth.triggerAttackRelease("C3", "4n");
+                }
+            } catch (e) {
+                console.warn("Audio playback issue:", e);
+            }
+        }
+
+        // ==========================================
+        // 4. DOM ELEMENTS CACHE
+        // ==========================================
+
+        const elements = {
+            nodeTitle: document.getElementById('node-title'),
+            sceneIcon: document.getElementById('scene-icon'),
+            storyText: document.getElementById('story-text'),
+            choicesContainer: document.getElementById('choices-container'),
+            inventoryList: document.getElementById('inventory-list'),
+            eventLog: document.getElementById('event-log'),
+            statHealthVal: document.getElementById('stat-health-val'),
+            statHealthBar: document.getElementById('stat-health-bar'),
+            statEnergyVal: document.getElementById('stat-energy-val'),
+            statEnergyBar: document.getElementById('stat-energy-bar'),
+            statCredits: document.getElementById('stat-credits'),
+            statKarma: document.getElementById('stat-karma'),
+            btnAudioToggle: document.getElementById('btn-audio-toggle'),
+            btnRestart: document.getElementById('btn-restart')
+        };
+
+        // ==========================================
+        // 5. CORE RENDER & LOGIC FUNCTIONS
+        // ==========================================
+
+        /**
+         * Render Player Stats and Health/Energy bars
+         */
+        function updateStatsUI() {
+            // Health
+            elements.statHealthVal.textContent = `${gameState.stats.health} / ${gameState.stats.maxHealth}`;
+            const healthPct = Math.max(0, Math.min(100, (gameState.stats.health / gameState.stats.maxHealth) * 100));
+            elements.statHealthBar.style.width = `${healthPct}%`;
+
+            // Energy
+            elements.statEnergyVal.textContent = `${gameState.stats.energy} / ${gameState.stats.maxEnergy}`;
+            const energyPct = Math.max(0, Math.min(100, (gameState.stats.energy / gameState.stats.maxEnergy) * 100));
+            elements.statEnergyBar.style.width = `${energyPct}%`;
+
+            // Credits
+            elements.statCredits.textContent = `${gameState.stats.credits} ₡`;
+
+            // Karma Text Transformation
+            let karmaText = "NEUTRAL";
+            if (gameState.stats.karma > 3) karmaText = "HEROIC";
+            else if (gameState.stats.karma < -3) karmaText = "RUTHLESS";
+            elements.statKarma.textContent = karmaText;
+        }
+
+        /**
+         * Render Inventory List dynamically using Array.prototype.forEach
+         */
+        function updateInventoryUI() {
+            elements.inventoryList.innerHTML = "";
+
+            if (gameState.inventory.length === 0) {
+                elements.inventoryList.innerHTML = `<p class="text-xs text-slate-500 italic p-2">No items in inventory.</p>`;
+                return;
+            }
+
+            // Using forEach to populate items with custom data attributes
+            gameState.inventory.forEach(item => {
+                const itemCard = document.createElement('div');
+                itemCard.className = "flex items-center gap-3 p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-cyan-500/40 transition-all";
+                itemCard.setAttribute('data-item-id', item.id);
+                
+                itemCard.innerHTML = `
+                    <span class="text-2xl">${item.icon || '📦'}</span>
+                    <div class="flex flex-col">
+                        <span class="font-semibold text-slate-200 text-sm">${item.name}</span>
+                        <span class="text-xs text-slate-400">${item.desc}</span>
+                    </div>
+                `;
+                elements.inventoryList.appendChild(itemCard);
+            });
+        }
+
+        /**
+         * Display temporal/event notifications
+         */
+        function showNotification(msg) {
+            elements.eventLog.textContent = msg;
+            elements.eventLog.classList.remove('hidden');
+            playSound('event');
+
+            setTimeout(() => {
+                elements.eventLog.classList.add('hidden');
+            }, 3500);
+        }
+
+        /**
+         * Checks whether player possesses required item
+         */
+        function playerHasItem(itemId) {
+            return gameState.inventory.some(item => item.id === itemId);
+        }
+
+        /**
+         * Main Story Render Engine
+         */
+        function renderStoryNode(nodeKey) {
+            const node = STORY_DATA[nodeKey];
+            if (!node) return;
+
+            gameState.currentNode = nodeKey;
+
+            // Render Title & Visuals
+            elements.nodeTitle.textContent = node.title;
+            elements.sceneIcon.textContent = node.icon || "🌌";
+
+            // Render Body Text
+            elements.storyText.innerHTML = `<p class="animate-fade-in">${node.text}</p>`;
+
+            // Clear choices container
+            elements.choicesContainer.innerHTML = "";
+
+            if (node.isEnding) {
+                // Handle Game Ending state
+                const restartBtn = document.createElement('button');
+                restartBtn.className = "w-full col-span-full py-3 px-4 rounded-xl bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500 font-heading font-bold text-slate-950 tracking-wider shadow-lg transition-transform transform active:scale-95";
+                restartBtn.textContent = "PLAY AGAIN / RESTART TIMELINE";
+                restartBtn.addEventListener('click', () => restartGame());
+                elements.choicesContainer.appendChild(restartBtn);
+                return;
+            }
+
+            // Render Choices dynamically using forEach
+            node.choices.forEach(choice => {
+                const btn = document.createElement('button');
+                const hasRequirement = !choice.reqItem || playerHasItem(choice.reqItem);
+
+                // Base styling
+                btn.className = `w-full text-left p-3.5 rounded-xl border flex flex-col justify-center transition-all duration-200 shadow-md ${
+                    hasRequirement 
+                        ? 'bg-slate-900/90 border-slate-700/80 hover:border-cyan-400 hover:bg-slate-800 text-slate-100 cursor-pointer active:scale-98' 
+                        : 'bg-slate-950/50 border-slate-900 text-slate-600 cursor-not-allowed'
+                }`;
+
+                // Set Data Attributes for DOM identification
+                btn.setAttribute('data-choice-id', choice.id);
+                if (choice.reqItem) {
+                    btn.setAttribute('data-required-item', choice.reqItem);
+                }
+
+                // Button Content
+                let btnContent = `<span class="font-semibold text-sm md:text-base flex items-center justify-between">
+                    <span>${choice.text}</span>
+                    ${hasRequirement ? '<span class="text-cyan-400 text-xs font-mono">SELECT →</span>' : '🔒'}
+                </span>`;
+
+                if (!hasRequirement && choice.reqMessage) {
+                    btnContent += `<span class="text-xs text-red-400 font-medium mt-1">${choice.reqMessage}</span>`;
+                }
+
+                btn.innerHTML = btnContent;
+
+                // Event listener for action
+                if (hasRequirement) {
+                    btn.addEventListener('click', () => {
+                        playSound('click');
+                        handleChoiceSelect(choice);
+                    });
+                }
+
+                elements.choicesContainer.appendChild(btn);
+            });
+
+            updateStatsUI();
+            updateInventoryUI();
+        }
+
+        /**
+         * Choice Resolution & State Mutations
+         */
+        function handleChoiceSelect(choice) {
+            let logNotes = [];
+
+            // Apply Stats Modification
+            if (choice.effect) {
+                if (choice.effect.health) {
+                    gameState.stats.health = Math.max(0, Math.min(gameState.stats.maxHealth, gameState.stats.health + choice.effect.health));
+                    logNotes.push(`${choice.effect.health > 0 ? '+' : ''}${choice.effect.health} HP`);
+                }
+                if (choice.effect.energy) {
+                    gameState.stats.energy = Math.max(0, Math.min(gameState.stats.maxEnergy, gameState.stats.energy + choice.effect.energy));
+                    logNotes.push(`${choice.effect.energy > 0 ? '+' : ''}${choice.effect.energy} Energy`);
+                }
+                if (choice.effect.credits) {
+                    gameState.stats.credits += choice.effect.credits;
+                    logNotes.push(`${choice.effect.credits > 0 ? '+' : ''}${choice.effect.credits} Credits`);
+                }
+                if (choice.effect.karma) {
+                    gameState.stats.karma += choice.effect.karma;
+                }
+                // Add Item
+                if (choice.effect.itemAdd) {
+                    if (!playerHasItem(choice.effect.itemAdd.id)) {
+                        gameState.inventory.push(choice.effect.itemAdd);
+                        logNotes.push(`Acquired: ${choice.effect.itemAdd.name}`);
+                    }
+                }
+            }
+
+            if (logNotes.length > 0) {
+                showNotification(`Status Update: ${logNotes.join(' | ')}`);
+            }
+
+            // Check Defeat condition
+            if (gameState.stats.health <= 0) {
+                triggerGameOver("Your physical condition reached zero. You lost consciousness as space-time collapsed.");
+                return;
+            }
+
+            // Transition to target node
+            renderStoryNode(choice.id);
+        }
+
+        /**
+         * Game Over Handler
+         */
+        function triggerGameOver(reason) {
+            playSound('gameover');
+            elements.nodeTitle.textContent = "SYSTEM FAILURE - GAME OVER";
+            elements.sceneIcon.textContent = "💀";
+            elements.storyText.innerHTML = `<p class="text-red-400 font-bold">${reason}</p><p class="mt-2 text-slate-400">The timeline collapsed before you could fulfill your mission.</p>`;
+            elements.choicesContainer.innerHTML = "";
+
+            const restartBtn = document.createElement('button');
+            restartBtn.className = "w-full col-span-full py-3 px-4 rounded-xl bg-red-900 hover:bg-red-800 text-white font-heading font-bold tracking-wider transition-all";
+            restartBtn.textContent = "🔄 REINITIALIZE TIMELINE (RESTART)";
+            restartBtn.addEventListener('click', () => restartGame());
+            elements.choicesContainer.appendChild(restartBtn);
+        }
+
+        /**
+         * Reset Game State
+         */
+        function restartGame() {
+            gameState = JSON.parse(JSON.stringify(INITIAL_STATE));
+            showNotification("Timeline Re-initialized.");
+            renderStoryNode("start");
+        }
+
+        // ==========================================
+        // 6. GLOBAL EVENT LISTENERS
+        // ==========================================
+
+        // Audio toggle button listener
+        elements.btnAudioToggle.addEventListener('click', () => {
+            initAudio();
+            gameState.audioEnabled = !gameState.audioEnabled;
+            elements.btnAudioToggle.textContent = gameState.audioEnabled ? "🔊 AUDIO: ON" : "🔇 AUDIO: OFF";
+            elements.btnAudioToggle.classList.toggle('text-cyan-400', gameState.audioEnabled);
+            elements.btnAudioToggle.classList.toggle('text-slate-400', !gameState.audioEnabled);
+        });
+
+        // Restart button listener
+        elements.btnRestart.addEventListener('click', () => {
+            if (confirm("Restart game and reset all progress?")) {
+                restartGame();
+            }
+        });
+
+        // Initialize Engine on Page Load
+        window.addEventListener('DOMContentLoaded', () => {
+            renderStoryNode("start");
+        });
+    </script>
+</body>
+</html>
